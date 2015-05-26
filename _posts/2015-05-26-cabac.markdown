@@ -1,0 +1,108 @@
+---
+layout:		post
+title:		"CABAC的初始化和二值化方案"
+date:		2015-05-26 14:19:00
+categories:	VideoCoding
+---
+
+当语法元素的描述子为ae(v)，并且entropy_coding_mode_flag=1时，应用CABAC解码过程。
+
+## 1 初始化过程（initialization process）
+
+在编码片中的第一个SE之前进行**context variables**和**decoding engine**的初始化。另外，当对mb_type的编码值为I_PCM时，其后会再次进行decoding engine的初始化工作
+
+### 1.1 初始化上下文变量(context variables)
+
+对每个由**ctxIdx**索引的context variables，查表得出出相应的(m,n)，然后计算得出相应的**pStateIdx**和**valMPS**。
+
+Note：
+
+- 共初始化1024个上下文变量，即ctxIdx=1~1023
+- 对于pStateIdx和valMPS的初始化会用到**SliceQPy**的数值
+- 对P，SP和B片，初始化pStateIdx和valMPS也会依赖   **cabac_init_idc**的数值
+
+### 1.2 初始化编码器（arithmetic encoding variables）
+
+算术解码器的状态由**codIRange**和**codIOffset**表示。
+
+1. codIRange = 0x01FE
+2. codIOffset = 0
+3. bitsOutstanding = symCnt = 0
+
+Note:
+
+- 码流中的数据不会使得codIOffset为0x01FE或0x01FF
+- codIRange和codIOffset的最小表示精度为 10bits和 9bits
+
+## 2 二值化过程（Binatization process）
+
+	输入：SE
+	输出：binarization(SE), maxBinIdxCtx, ctxIdxOffset, and bypassFlag
+
+其中，
+
+1. **maxBinIdxCtxIdx**和**ctxIdxOffset**由表9-34得到.并且，变量ctxIdxOffset表示为相应语法元素ctxIdx范围的最小值。
+2. 变量bypassFlag由下面得到：
+	- 如果binarization(SE)的ctxIdxOffset没有被赋值或者在表9-34中标记为`na`，则bypassFlag=1
+	- 否则，bypassFlag=0
+
+### 2.1 编码方案
+
+有四种基本编码方案，分别为一元码、截断一元码、指数哥伦布码和固定长编码。除了基本编码方案以外，还有串接方案和专为mb_type以及sub_mb_type的人工选择方案。
+
+#### 2.2 指数哥伦布码及相关编码方案
+
+##### 2.2.1 Truncated binary encoding
+
+> **Truncated binary encoding** is an entropy encoding used for uniform probablity distributions with a finite alphabet. **It is parameterized by an alphabet with total size of number *n*.** It is a slightly more general form of binary encoding when n is not a power of two.
+>
+> If n is a power of two then the coded value for $$ 0 \leq x < n$$is the simple binary code for x of legth $$log_2(n)$$. Otherwise let \\[k=floor(log_2(x))\\]such that \\[2^k \leq n < 2^{k+1}\\]and let \\[u=2^{k+1}-n\\]
+> Truscated binary encoding assigns the first u symbols codewords of length k and then assigns the remaining $$n-u$$ symbols the **last** $$n-u$$ codewords of length k+1.
+
+##### 2.2.2 Golomb encoding
+
+> - **prefix:** $$floor(n/m)$$的一元码表示
+> - **suffix:**对余数$$r=n-floor(n/m)$$用truncated binary encoding编码。
+> 
+> **Note:**
+> 
+> - Golomb编码仅能表示非负整数。因此，为了能表示负值，通常利用映射:$$M(u)= (n \geq 0\ ?\ 2n:-2n-1)$$
+> - 当$$m=2^k,c=0$$时，便成为了Golomb-Rice码
+> - 当PMF:\\[P(n)=(1-\rho)\rho^n\\]时，Golomb码是最佳的。在该意义下，当\\[m=\frac{log_2(1+\rho)}{log_2(1/\rho)}\\]时，$$G_m(n)$$为所有唯一可判读的编码提供了最短的平均码长。
+
+##### 2.2.3 exp-Golomb encoding
+
+> - **prefix:** 寻找整数i使得\\[\sum_{j=0}^{i-1}2^{j+k}\leq n < \sum_{j=0}^{i}2^{j+k}\\]并形成 *i* 的一元码
+> - **suffix:** 把二进制表示\\[n-\sum_{j=0}^{i-1}2^{j+k}\\]截断到 *k+i* 个最低阶比特，这里
+
+~~~c
+	stopLoop = 0;
+	temp = k;
+	do 
+	{
+		if (val >= (1 << temp)
+		{
+			put(1);
+			val -= (1 << temp)
+			temp++;
+		}  
+		else{
+			put(0);
+			while(temp--) //temp=k+i,k+i-1,...
+				put((val >> temp) & 0x01)
+			stopLoop = 1;
+		}
+	} while(!stopLoop)
+~~~
+
+#### 2.2.4 UEGk编码
+
+UEGk编码用于对**mvd_lX**和**coeff_abs_level_minus1**编码，其k分别为3,0
+
+- prefix：截断二进制码
+- suffix: 指数哥伦布码
+
+
+
+
+
