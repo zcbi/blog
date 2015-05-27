@@ -22,3 +22,5 @@ paginate: 10
 
 jekyll-archives:
 enabled: all
+
+keep_files: [".git", "CNAME", ".nojekyll"]
