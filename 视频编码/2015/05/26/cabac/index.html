@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    <title>说点什么呢...</title>
+
+    <!-- Bootstrap -->
+    <link href="http://cdn.staticfile.org/twitter-bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/blog/css/main.css" rel="stylesheet">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="http://cdn.staticfile.org/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="http://cdn.staticfile.org/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+  <nav class="navbar navbar-default" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+              data-target="#bs-example-navbar-collapse-1">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="/blog/">说点什么呢...</a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+      <ul class="nav navbar-nav navbar-right">
+        <li><a href="/blog/">首页</a></li>
+        <li><a href="/blog/about.html">关于</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="content">
+  <div class="container">
+    <div class="row">
+      <div class="main col-lg-8 col-md-8 col-sm-12 col-xs-12">
+        
+
+<article class="post">
+  <header class="post-header">
+    <h1 class="post-title"><a href="/blog/%E8%A7%86%E9%A2%91%E7%BC%96%E7%A0%81/2015/05/26/cabac/">CABAC的初始化和二值化方案</a></h1>
+    <p class="post-meta">
+      
+      2015年5月26日
+      <a href="/blog/category/" title="视频编码">视频编码</a></p>
+  </header>
+
+  <div class="post-content">
+    <p>当语法元素的描述子为ae(v)，并且entropy_coding_mode_flag=1时，应用CABAC解码过程。</p>
+
+<h2 id="initialization-process">1 初始化过程（initialization process）</h2>
+
+<p>在编码片中的第一个SE之前进行<strong>context variables</strong>和<strong>decoding engine</strong>的初始化。另外，当对mb_type的编码值为I_PCM时，其后会再次进行decoding engine的初始化工作</p>
+
+<h3 id="context-variables">1.1 初始化上下文变量(context variables)</h3>
+
+<p>对每个由<strong>ctxIdx</strong>索引的context variables，查表得出出相应的(m,n)，然后计算得出相应的<strong>pStateIdx</strong>和<strong>valMPS</strong>。</p>
+
+<p>Note：</p>
+
+<ul>
+  <li>共初始化1024个上下文变量，即ctxIdx=1~1023</li>
+  <li>对于pStateIdx和valMPS的初始化会用到<strong>SliceQPy</strong>的数值</li>
+  <li>对P，SP和B片，初始化pStateIdx和valMPS也会依赖   <strong>cabac_init_idc</strong>的数值</li>
+</ul>
+
+<h3 id="arithmetic-encoding-variables">1.2 初始化编码器（arithmetic encoding variables）</h3>
+
+<p>算术解码器的状态由<strong>codIRange</strong>和<strong>codIOffset</strong>表示。</p>
+
+<ol>
+  <li>codIRange = 0x01FE</li>
+  <li>codIOffset = 0</li>
+  <li>bitsOutstanding = symCnt = 0</li>
+</ol>
+
+<p>Note:</p>
+
+<ul>
+  <li>码流中的数据不会使得codIOffset为0x01FE或0x01FF</li>
+  <li>codIRange和codIOffset的最小表示精度为 10bits和 9bits</li>
+</ul>
+
+<h2 id="binatization-process">2 二值化过程（Binatization process）</h2>
+
+<pre><code>输入：SE
+输出：binarization(SE), maxBinIdxCtx, ctxIdxOffset, and bypassFlag
+</code></pre>
+
+<p>其中，</p>
+
+<ol>
+  <li><strong>maxBinIdxCtxIdx</strong>和<strong>ctxIdxOffset</strong>由表9-34得到.并且，变量ctxIdxOffset表示为相应语法元素ctxIdx范围的最小值。</li>
+  <li>变量bypassFlag由下面得到：
+    <ul>
+      <li>如果binarization(SE)的ctxIdxOffset没有被赋值或者在表9-34中标记为<code>na</code>，则bypassFlag=1</li>
+      <li>否则，bypassFlag=0</li>
+    </ul>
+  </li>
+</ol>
+
+<h3 id="section">2.1 编码方案</h3>
+
+<p>有四种基本编码方案，分别为一元码、截断一元码、指数哥伦布码和固定长编码。除了基本编码方案以外，还有串接方案和专为mb_type以及sub_mb_type的人工选择方案。</p>
+
+<h4 id="section-1">2.2 指数哥伦布码及相关编码方案</h4>
+
+<h5 id="truncated-binary-encoding">2.2.1 Truncated binary encoding</h5>
+
+<blockquote>
+  <p><strong>Truncated binary encoding</strong> is an entropy encoding used for uniform probablity distributions with a finite alphabet. <strong>It is parameterized by an alphabet with total size of number <em>n</em>.</strong> It is a slightly more general form of binary encoding when n is not a power of two.</p>
+
+  <p>If n is a power of two then the coded value for <script type="math/tex">% <![CDATA[
+0 \leq x < n %]]></script>is the simple binary code for x of legth <script type="math/tex">log_2(n)</script>. Otherwise let \[k=floor(log_2(x))\]such that \[2^k \leq n &lt; 2^{k+1}\]and let \[u=2^{k+1}-n\]
+Truscated binary encoding assigns the first u symbols codewords of length k and then assigns the remaining <script type="math/tex">n-u</script> symbols the <strong>last</strong> <script type="math/tex">n-u</script> codewords of length k+1.</p>
+</blockquote>
+
+<h5 id="golomb-encoding">2.2.2 Golomb encoding</h5>
+
+<blockquote>
+  <ul>
+    <li><strong>prefix:</strong> <script type="math/tex">floor(n/m)</script>的一元码表示</li>
+    <li><strong>suffix:</strong>对余数<script type="math/tex">r=n-floor(n/m)</script>用truncated binary encoding编码。</li>
+  </ul>
+
+  <p><strong>Note:</strong></p>
+
+  <ul>
+    <li>Golomb编码仅能表示非负整数。因此，为了能表示负值，通常利用映射:<script type="math/tex">M(u)= (n \geq 0\ ?\ 2n:-2n-1)</script></li>
+    <li>当<script type="math/tex">m=2^k,c=0</script>时，便成为了Golomb-Rice码</li>
+    <li>当PMF:\[P(n)=(1-\rho)\rho^n\]时，Golomb码是最佳的。在该意义下，当\[m=\frac{log_2(1+\rho)}{log_2(1/\rho)}\]时，<script type="math/tex">G_m(n)</script>为所有唯一可判读的编码提供了最短的平均码长。</li>
+  </ul>
+</blockquote>
+
+<h5 id="exp-golomb-encoding">2.2.3 exp-Golomb encoding</h5>
+
+<blockquote>
+  <ul>
+    <li><strong>prefix:</strong> 寻找整数i使得\[\sum_{j=0}^{i-1}2^{j+k}\leq n &lt; \sum_{j=0}^{i}2^{j+k}\]并形成 <em>i</em> 的一元码</li>
+    <li><strong>suffix:</strong> 把二进制表示\[n-\sum_{j=0}^{i-1}2^{j+k}\]截断到 <em>k+i</em> 个最低阶比特，这里</li>
+  </ul>
+</blockquote>
+
+<pre><code class="language-c">	stopLoop = 0;
+	temp = k;
+	do 
+	{
+		if (val &gt;= (1 &lt;&lt; temp)
+		{
+			put(1);
+			val -= (1 &lt;&lt; temp)
+			temp++;
+		}  
+		else{
+			put(0);
+			while(temp--) //temp=k+i,k+i-1,...
+				put((val &gt;&gt; temp) &amp; 0x01)
+			stopLoop = 1;
+		}
+	} while(!stopLoop)
+</code></pre>
+
+<h4 id="uegk">2.2.4 UEGk编码</h4>
+
+<p>UEGk编码用于对<strong>mvd_lX</strong>和<strong>coeff_abs_level_minus1</strong>编码，其k分别为3,0</p>
+
+<ul>
+  <li>prefix：截断二进制码</li>
+  <li>suffix: 指数哥伦布码</li>
+</ul>
+
+
+  </div>
+</article>
+
+
+
+
+<nav>
+  <ul class="pager">
+    
+    <li class="previous">
+      <a rel="prev" href="/blog/jekyll/update/2015/05/25/welcome-to-jekyll/" title="Welcome to Jekyll!">
+        &laquo; 前一篇</a>
+    </li>
+    
+
+    
+    <li class="next">
+      <a rel="next" href="/blog/%E8%A7%86%E9%A2%91%E7%BC%96%E7%A0%81/2015/05/27/my-graduation-project/" title="我的毕设论文草稿">
+        后一篇 &raquo;</a>
+    </li>
+    
+  </ul>
+</nav>
+
+      </div>
+
+      <div class="sidebar col-lg-4 col-md-4 col-sm-12 col-xs-12">
+        <aside class="about">
+	<h3 class="aside-title">关于</h3>
+	<div class="aside-content">
+		<p>这是在学习jekyll中建立的测试blog
+</p>
+	</div>
+</aside>
+
+<aside class="categories_list">
+  <h3 class="aside-title">分类</h3>
+  <div class="aside-content">
+    <ul><li><a href="/blog/category/jekyll/" title="jekyll">jekyll</a> (1)</li><li><a href="/blog/category/update/" title="update">update</a> (1)</li><li><a href="/blog/category/" title="视频编码">视频编码</a> (2)</li></ul>
+  </div>
+</aside>
+
+<aside class="subsribe">
+	<h3 class="aside-title">订阅</h3>
+	<div class="aside-content">
+		<p>订阅 <a href="/blog.feed.xml">RSS</a></p>
+	</div>
+</aside>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <footer class="footer">
+    <p>&copy; 2014 说点什么呢...</p>
+    <p>Jekyll 2.5.3</p>
+  </footer>
+  </body>
+</html>
