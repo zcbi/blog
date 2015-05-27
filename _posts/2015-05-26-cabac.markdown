@@ -2,7 +2,7 @@
 layout:		post
 title:		"CABAC的初始化和二值化方案"
 date:		2015-05-26 14:19:00
-categories:	VideoCoding
+categories:	视频编码
 ---
 
 当语法元素的描述子为ae(v)，并且entropy_coding_mode_flag=1时，应用CABAC解码过程。
