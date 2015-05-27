@@ -5,4 +5,5 @@ gem 'rake'
 
 group :jekyll_plugins do
   gem 'jekyll-sitemap'
+  gem 'jekyll-archives', '~> 2.0.0'
 end
